@@ -7,4 +7,6 @@ uint32_t kute_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a);
 
 void kute_clear(uint32_t *pixels, int pw, int ph, uint32_t color);
 
+void kute_fill_rect(uint32_t *pixels, int pw, int ph, int x0, int y0, int rw, int rh, uint32_t color);
+
 #endif // H_KUTE
