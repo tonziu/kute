@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <windows.h>
+#include "kute.h"
 
 #define KUTE_OK 0
 #define KUTE_ERROR -1
@@ -293,13 +294,15 @@ static inline uint32_t RGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
 
 int main(void)
 {
-    if (kute_InitWindow(WIDTH, HEIGHT, "Kute (win32) - Alpha Blending") == KUTE_ERROR)
+    if (kute_InitWindow(WIDTH, HEIGHT, "Kute (win32)") == KUTE_ERROR)
         return -1;
 
     while (kute_WindowIsRunning())
     {
         kute_HandleEvents();
         
+        kute_clear(pixels, WIDTH, HEIGHT, kute_rgba(22, 22, 22, 255));
+
         kute_SwapBuffers();
         Sleep(16);
     }
