@@ -42,3 +42,24 @@ void kute_fill_rect(uint32_t *pixels, int pw, int ph, int x0, int y0, int rw, in
         }
     }
 }
+
+void kute_fill_circle(uint32_t *pixels, int pw, int ph, int cx, int cy, int radius, uint32_t color)
+{
+    if (!pixels || pw <= 0 || ph <= 0) return;
+
+    for (int x = cx - radius; x < cx + radius; ++x)
+    {
+        for (int y = cy - radius; y < cy + radius; ++y)
+        {
+            if (x >= 0 && x < pw && y >= 0 && y < ph)
+            {
+                int dx = x - cx;
+                int dy = y - cy;
+                if (dx * dx + dy * dy <= radius * radius)
+                {
+                    pixels[x + y * pw] = color;
+                }
+            }
+        }
+    }
+}
