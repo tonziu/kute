@@ -200,17 +200,31 @@ void kute_fill_triangle(uint32_t *pixels, int pw, int ph, int x0, int y0, int x1
 
     for (int y = y0; y <= y1; ++y)
     {
+        if (y < 0 || y > ph) continue;
+
         int xa = x0 + (int)((y - y0) * dxdy01);
         int xb = x0 + (int)((y - y0) * dxdy02); 
         
-        kute_draw_line(pixels, pw, ph, xa, y, xb, y, color);
+        for (int x = xa; x <= xb; ++x)
+        {
+            if (x < 0 || x > pw) continue;
+            uint32_t curr = pixels[x + y * pw];
+            pixels[x + y * pw] = kute_blend_color(color, curr);
+        }
     }
 
     for (int y = y1; y <= y2; ++y)
     {
+        if (y < 0 || y > ph) continue;
+
         int xa = x1 + (int)((y - y1) * dxdy12); 
         int xb = x0 + (int)((y - y0) * dxdy02);  
         
-        kute_draw_line(pixels, pw, ph, xa, y, xb, y, color);
+        for (int x = xa; x <= xb; ++x)
+        {
+            if (x < 0 || x > pw) continue;
+            uint32_t curr = pixels[x + y * pw];
+            pixels[x + y * pw] = kute_blend_color(color, curr);
+        }
     }
 }
