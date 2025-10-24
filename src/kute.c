@@ -31,14 +31,13 @@ void kute_fill_rect(uint32_t *pixels, int pw, int ph, int x0, int y0, int rw, in
         y0 -= rh;
     }
 
-    for (int x = x0; x < x0 + rw; ++x)
+    for (int y = y0; y < y0 + rh; ++y)
     {
-        for (int y = y0; y < y0 + rh; ++y)
+        if (y < 0 || y > ph) continue;
+        for (int x = x0; x < x0 + rw; ++x)
         {
-            if (x >= 0 && x < pw && y >= 0 && y < ph)
-            {
-                pixels[x + y * pw] = color;
-            }
+            if (x < 0 || x > pw) continue;
+            pixels[x + y * pw] = color;
         }
     }
 }
