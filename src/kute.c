@@ -1,5 +1,32 @@
 #include "kute.h"
 
+void kute_unpack_rgba32(uint32_t color, uint8_t *r, uint8_t *g, uint8_t *b, uint8_t* a)
+{
+    *r = (color >>  0) & 0xFF;
+    *g = (color >>  8) & 0xFF;
+    *b = (color >> 16) & 0xFF;
+    *a = (color >> 24) & 0xFF;
+}
+
+uint32_t kute_blend_color(uint32_t src, uint32_t dest)
+{
+    uint8_t src_r, src_g, src_b, src_a;
+    uint8_t dest_r, dest_g, dest_b, dest_a;
+
+    kute_unpack_rgba32(src, &src_r, &src_g, &src_b, &src_a);
+    kute_unpack_rgba32(dest, &dest_r, &dest_g, &dest_b, &dest_a);
+    
+    uint32_t alpha = src_a;
+    uint32_t invalpha = 255 - alpha;
+
+    uint8_t r = (src_r * alpha + dest_r * invalpha) / 255;
+    uint8_t g = (src_g * alpha + dest_g * invalpha) / 255;
+    uint8_t b = (src_b * alpha + dest_b * invalpha) / 255;
+    uint8_t a = src_a > dest_a ? src_a : dest_a;
+    
+    return kute_rgba(r, g, b, a);
+}
+
 uint32_t kute_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
 {
     return a << 24 | b << 16 | g << 8 | r;
@@ -37,7 +64,8 @@ void kute_fill_rect(uint32_t *pixels, int pw, int ph, int x0, int y0, int rw, in
         for (int x = x0; x < x0 + rw; ++x)
         {
             if (x < 0 || x > pw) continue;
-            pixels[x + y * pw] = color;
+            uint32_t curr = pixels[x + y * pw];
+            pixels[x + y * pw] = kute_blend_color(color, curr);
         }
     }
 }
@@ -46,10 +74,8 @@ void kute_fill_circle(uint32_t *pixels, int pw, int ph, int cx, int cy, int radi
 {
     if (!pixels || pw <= 0 || ph <= 0) return;
 
-    uint8_t r = (color >> 0)  & 0xFF;
-    uint8_t g = (color >> 8)  & 0xFF;
-    uint8_t b = (color >> 16) & 0xFF;
-    uint8_t a = (color >> 24) & 0xFF;
+    uint8_t r, g, b, a;
+    kute_unpack_rgba32(color, &r, &g, &b, &a);
 
     int aa_samples = 4;
     float aa_step = 1.0f / aa_samples;
