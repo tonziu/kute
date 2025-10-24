@@ -1,5 +1,9 @@
 # Kute
 
+<p align="center">
+  <img width="600" height="400" alt="image" src="https://github.com/user-attachments/assets/00c63bfd-65a7-4c4b-bdbb-eb71fca587d2">
+</p>
+
 Kute is a tiny, cross-platform and CPU-only graphics library in C. I use it to learn the very fundamentals of graphics.
 The goal is to have something very simple, easy to understand, and that can be improved. Any suggestion is vastly appreciated.
 
