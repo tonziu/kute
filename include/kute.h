@@ -11,4 +11,6 @@ void kute_fill_rect(uint32_t *pixels, int pw, int ph, int x0, int y0, int rw, in
 
 void kute_fill_circle(uint32_t *pixels, int pw, int ph, int cx, int cy, int radius, uint32_t color);
 
+void kute_draw_line(uint32_t *pixels, int pw, int ph, int x0, int y0, int x1, int y1, uint32_t color);
+
 #endif // H_KUTE

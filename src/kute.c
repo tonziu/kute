@@ -1,4 +1,5 @@
 #include "kute.h"
+#include <stdbool.h>
 
 void kute_unpack_rgba32(uint32_t color, uint8_t *r, uint8_t *g, uint8_t *b, uint8_t* a)
 {
@@ -115,9 +116,72 @@ void kute_fill_circle(uint32_t *pixels, int pw, int ph, int cx, int cy, int radi
                 uint8_t final_alpha = (uint8_t)(a * coverage);
                 
                 uint32_t blended = kute_rgba(r, g, b, final_alpha);
+
+                uint32_t curr = pixels[x + y * pw];
                 
-                pixels[x + y * pw] = blended;
+                pixels[x + y * pw] = kute_blend_color(blended, curr);
             }
         }
+    }
+}
+
+int abs(int value)
+{
+    return value < 0 ? -value : value;
+}
+
+void swap(int* a, int* b)
+{
+    int temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+void kute_draw_line(uint32_t *pixels, int pw, int ph, int x0, int y0, int x1, int y1, uint32_t color)
+{
+    if (!pixels || pw <= 0 || ph <= 0) return;
+
+    int dx = abs(x1 - x0);
+    int dy = abs(y1 - y0);
+
+    int sx = x0 < x1 ? 1 : -1;
+    int sy = y0 < y1 ? 1 : -1;
+
+    bool is_vert = dy > dx;
+
+    if (is_vert)
+        swap(&dx, &dy);
+
+    int d = 2 * dy - dx;
+    int x = x0;
+    int y = y0;
+
+    while (1)
+    {
+        if (x >= 0 && x < pw && y > 0 && y < ph)
+        {
+            uint32_t curr = pixels[x + y * pw];
+            pixels[x + y * pw] = kute_blend_color(color, curr);
+        }
+
+        if (x == x1 && y == y1)
+            break;
+
+        if (d > 0)
+        {
+            if (is_vert)
+                x += sx;
+            else
+                y += sy;
+            d += 2 * (dy - dx);
+        }
+        else
+        {
+            d += 2 * dy;
+        }
+        if (is_vert)
+            y += sy;
+        else
+            x += sx;
     }
 }
