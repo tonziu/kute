@@ -47,18 +47,51 @@ void kute_fill_circle(uint32_t *pixels, int pw, int ph, int cx, int cy, int radi
 {
     if (!pixels || pw <= 0 || ph <= 0) return;
 
-    for (int x = cx - radius; x < cx + radius; ++x)
+    uint8_t r = (color >> 0)  & 0xFF;
+    uint8_t g = (color >> 8)  & 0xFF;
+    uint8_t b = (color >> 16) & 0xFF;
+    uint8_t a = (color >> 24) & 0xFF;
+
+    int aa_samples = 4;
+    float aa_step = 1.0f / aa_samples;
+    float aa2 = (float)(aa_samples * aa_samples);
+
+    for (int y = cy - radius - 1; y <= cy + radius + 1; ++y)
     {
-        for (int y = cy - radius; y < cy + radius; ++y)
+        if (y < 0 || y >= ph) continue;
+        
+        for (int x = cx - radius - 1; x <= cx + radius + 1; ++x)
         {
-            if (x >= 0 && x < pw && y >= 0 && y < ph)
+            if (x < 0 || x >= pw) continue;
+            
+            int aa_count = 0;
+            
+            for (int i = 0; i < aa_samples; i++)
             {
-                int dx = x - cx;
-                int dy = y - cy;
-                if (dx * dx + dy * dy <= radius * radius)
+                for (int j = 0; j < aa_samples; j++)
                 {
-                    pixels[x + y * pw] = color;
+                    float sx = x + (i + 0.5f) * aa_step;
+                    float sy = y + (j + 0.5f) * aa_step;
+                    
+                    float dx = sx - cx;
+                    float dy = sy - cy;
+                    
+                    if (dx*dx + dy*dy <= radius * radius)
+                    {
+                        aa_count++;
+                    }
                 }
+            }
+
+            if (aa_count > 0)
+            {
+                float coverage = aa_count / aa2;
+                
+                uint8_t final_alpha = (uint8_t)(a * coverage);
+                
+                uint32_t blended = kute_rgba(r, g, b, final_alpha);
+                
+                pixels[x + y * pw] = blended;
             }
         }
     }
