@@ -16,9 +16,9 @@ typedef struct
     BITMAPINFO bminfo;
     HDC hdc;
     HDC hdcMem;
-    HDC hdcBuffer;        // DC per double buffering
+    HDC hdcBuffer;
     HBITMAP hBitmap;
-    HBITMAP hBitmapBuffer; // Bitmap per double buffering
+    HBITMAP hBitmapBuffer;
     HBITMAP hOldBitmap;
     HBITMAP hOldBitmapBuffer;
     uint32_t *pixels_premul;
@@ -72,14 +72,12 @@ static void Win32ResizeDIBSection(int width, int height)
         win32_platform.hOldBitmap = SelectObject(win32_platform.hdcMem, win32_platform.hBitmap);
     }
 
-    // Crea bitmap per double buffering (compatibile con lo schermo)
     win32_platform.hBitmapBuffer = CreateCompatibleBitmap(win32_platform.hdc, width, height);
     if (win32_platform.hBitmapBuffer)
     {
         win32_platform.hOldBitmapBuffer = SelectObject(win32_platform.hdcBuffer, win32_platform.hBitmapBuffer);
     }
 
-    // Alloca buffer separato per i pixel dell'utente
     int pixelsSize = (width * height) * sizeof(uint32_t);
     pixels = VirtualAlloc(0, pixelsSize, MEM_COMMIT, PAGE_READWRITE);
 
@@ -87,40 +85,33 @@ static void Win32ResizeDIBSection(int width, int height)
     win32_platform.current_height = height;
 }
 
-// Copia i pixel premoltiplicando l'alpha nel buffer temporaneo
 static void Win32CopyAndPremultiplyAlpha()
 {
     int pixel_count = win32_platform.current_width * win32_platform.current_height;
     
     for (int i = 0; i < pixel_count; ++i)
     {
-        uint32_t pixel = pixels[i];  // Leggi dal buffer utente in formato 0xAABBGGRR
+        uint32_t pixel = pixels[i]; 
         uint8_t r = (pixel >> 0) & 0xFF;
         uint8_t g = (pixel >> 8) & 0xFF;
         uint8_t b = (pixel >> 16) & 0xFF;
         uint8_t a = (pixel >> 24) & 0xFF;
         
-        // Premoltiplica RGB per alpha
         r = (r * a) / 255;
         g = (g * a) / 255;
         b = (b * a) / 255;
         
-        // Scrivi nel buffer della bitmap in formato BGRA (Windows)
         win32_platform.pixels_premul[i] = (a << 24) | (r << 16) | (g << 8) | b;
     }
 }
 
 static void Win32UpdateClientArea(HDC hdc)
 {
-    // Copia e premoltiplica l'alpha
     Win32CopyAndPremultiplyAlpha();
     
-    // Disegna nel buffer offscreen
-    // 1. Pulisci lo sfondo nero
     RECT rect = {0, 0, win32_platform.current_width, win32_platform.current_height};
     FillRect(win32_platform.hdcBuffer, &rect, (HBRUSH)GetStockObject(BLACK_BRUSH));
     
-    // 2. Fai il blend nel buffer
     AlphaBlend(
         win32_platform.hdcBuffer,
         0, 0, win32_platform.current_width, win32_platform.current_height,
@@ -129,7 +120,6 @@ static void Win32UpdateClientArea(HDC hdc)
         win32_platform.blend
     );
     
-    // 3. Copia tutto il buffer sullo schermo in una volta (no flickering)
     BitBlt(
         hdc,
         0, 0, win32_platform.current_width, win32_platform.current_height,
@@ -200,9 +190,8 @@ int kute_InitWindow(int width, int height, const char* title)
     width = drawableArea.right - drawableArea.left;
     height = drawableArea.bottom - drawableArea.top;
     
-    // Finestra normale (NON layered) per mantenere la barra del titolo
     win32_platform.hWnd = CreateWindowExA(
-                              0,  // Nessun extended style
+                              0, 
                               "MainWClass", 
                               title, 
                               WS_OVERLAPPEDWINDOW,
@@ -222,10 +211,9 @@ int kute_InitWindow(int width, int height, const char* title)
     
     HDC hdcScreen = GetDC(NULL);
     win32_platform.hdcMem = CreateCompatibleDC(hdcScreen);
-    win32_platform.hdcBuffer = CreateCompatibleDC(hdcScreen);  // DC per double buffering
+    win32_platform.hdcBuffer = CreateCompatibleDC(hdcScreen); 
     ReleaseDC(NULL, hdcScreen);
 
-    // Configurazione blend function (una volta sola)
     win32_platform.blend.BlendOp = AC_SRC_OVER;
     win32_platform.blend.BlendFlags = 0;
     win32_platform.blend.SourceConstantAlpha = 255;
@@ -286,7 +274,6 @@ void kute_CloseWindow()
     DestroyWindow(win32_platform.hWnd);
 }
 
-// Funzione helper per creare colori in formato 0xAABBGGRR
 static inline uint32_t RGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
 {
     return (a << 24) | (b << 16) | (g << 8) | r;
@@ -302,7 +289,9 @@ int main(void)
         kute_HandleEvents();
         
         kute_clear(pixels, WIDTH, HEIGHT, kute_rgba(22, 22, 22, 255));
-        kute_fill_circle(pixels, WIDTH, HEIGHT, 400, 300, 200, kute_rgba(200, 200, 200, 255));
+        kute_fill_circle(pixels, WIDTH, HEIGHT, WIDTH/2, HEIGHT/2, 40, kute_rgba(60, 60, 60, 128));
+        kute_draw_line(pixels, WIDTH, HEIGHT, 325, 300, 475, 300, kute_rgba(0, 255, 0, 255));
+        kute_draw_line(pixels, WIDTH, HEIGHT, 400, 245, 400, 355, kute_rgba(0, 255, 0, 255));
         
         kute_SwapBuffers();
         Sleep(16);

@@ -185,3 +185,32 @@ void kute_draw_line(uint32_t *pixels, int pw, int ph, int x0, int y0, int x1, in
             x += sx;
     }
 }
+
+void kute_fill_triangle(uint32_t *pixels, int pw, int ph, int x0, int y0, int x1, int y1, int x2, int y2, uint32_t color)
+{
+    if (!pixels || pw <= 0 || ph <= 0) return;
+
+    if (y0 > y1) { swap(&x0, &x1); swap(&y0, &y1); }
+    if (y0 > y2) { swap(&x0, &x2); swap(&y0, &y2); }
+    if (y1 > y2) { swap(&x1, &x2); swap(&y1, &y2); }
+
+    float dxdy01 = (y1 - y0) != 0 ? (x1 - x0) / (float)(y1 - y0) : 0;
+    float dxdy02 = (y2 - y0) != 0 ? (x2 - x0) / (float)(y2 - y0) : 0;
+    float dxdy12 = (y2 - y1) != 0 ? (x2 - x1) / (float)(y2 - y1) : 0;
+
+    for (int y = y0; y <= y1; ++y)
+    {
+        int xa = x0 + (int)((y - y0) * dxdy01);
+        int xb = x0 + (int)((y - y0) * dxdy02); 
+        
+        kute_draw_line(pixels, pw, ph, xa, y, xb, y, color);
+    }
+
+    for (int y = y1; y <= y2; ++y)
+    {
+        int xa = x1 + (int)((y - y1) * dxdy12); 
+        int xb = x0 + (int)((y - y0) * dxdy02);  
+        
+        kute_draw_line(pixels, pw, ph, xa, y, xb, y, color);
+    }
+}
