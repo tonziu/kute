@@ -193,10 +193,10 @@ void kute_fill_rect(uint32_t *pixels, int pw, int ph, int x0, int y0, int rw, in
 
     for (int y = y0; y < y0 + rh; ++y)
     {
-        if (y < 0 || y > ph) continue;
+        if (y < 0 || y >= ph) continue;
         for (int x = x0; x < x0 + rw; ++x)
         {
-            if (x < 0 || x > pw) continue;
+            if (x < 0 || x >= pw) continue;
             uint32_t curr = pixels[x + y * pw];
             pixels[x + y * pw] = kute_blend_color(color, curr);
         }
@@ -243,7 +243,7 @@ void kute_fill_circle(uint32_t *pixels, int pw, int ph, int cx, int cy, int radi
 
             if (aa_count > 0)
             {
-                float coverage = aa_count / aa2;
+                float coverage = (float) aa_count / aa2;
                 
                 uint8_t final_alpha = (uint8_t)(a * coverage);
                 
@@ -257,12 +257,12 @@ void kute_fill_circle(uint32_t *pixels, int pw, int ph, int cx, int cy, int radi
     }
 }
 
-int abs(int value)
+int kute_abs(int value)
 {
     return value < 0 ? -value : value;
 }
 
-void swap(int* a, int* b)
+void kute_swap(int* a, int* b)
 {
     int temp = *a;
     *a = *b;
@@ -273,8 +273,8 @@ void kute_draw_line(uint32_t *pixels, int pw, int ph, int x0, int y0, int x1, in
 {
     if (!pixels || pw <= 0 || ph <= 0) return;
 
-    int dx = abs(x1 - x0);
-    int dy = abs(y1 - y0);
+    int dx = kute_abs(x1 - x0);
+    int dy = kute_abs(y1 - y0);
 
     int sx = x0 < x1 ? 1 : -1;
     int sy = y0 < y1 ? 1 : -1;
@@ -282,7 +282,7 @@ void kute_draw_line(uint32_t *pixels, int pw, int ph, int x0, int y0, int x1, in
     bool is_vert = dy > dx;
 
     if (is_vert)
-        swap(&dx, &dy);
+        kute_swap(&dx, &dy);
 
     int d = 2 * dy - dx;
     int x = x0;
@@ -290,7 +290,7 @@ void kute_draw_line(uint32_t *pixels, int pw, int ph, int x0, int y0, int x1, in
 
     while (1)
     {
-        if (x >= 0 && x < pw && y > 0 && y < ph)
+        if (x >= 0 && x < pw && y >= 0 && y < ph)
         {
             uint32_t curr = pixels[x + y * pw];
             pixels[x + y * pw] = kute_blend_color(color, curr);
@@ -322,9 +322,9 @@ void kute_fill_triangle(uint32_t *pixels, int pw, int ph, int x0, int y0, int x1
 {
     if (!pixels || pw <= 0 || ph <= 0) return;
 
-    if (y0 > y1) { swap(&x0, &x1); swap(&y0, &y1); }
-    if (y0 > y2) { swap(&x0, &x2); swap(&y0, &y2); }
-    if (y1 > y2) { swap(&x1, &x2); swap(&y1, &y2); }
+    if (y0 > y1) { kute_swap(&x0, &x1); kute_swap(&y0, &y1); }
+    if (y0 > y2) { kute_swap(&x0, &x2); kute_swap(&y0, &y2); }
+    if (y1 > y2) { kute_swap(&x1, &x2); kute_swap(&y1, &y2); }
 
     float dxdy01 = (y1 - y0) != 0 ? (x1 - x0) / (float)(y1 - y0) : 0;
     float dxdy02 = (y2 - y0) != 0 ? (x2 - x0) / (float)(y2 - y0) : 0;
@@ -332,7 +332,7 @@ void kute_fill_triangle(uint32_t *pixels, int pw, int ph, int x0, int y0, int x1
 
     for (int y = y0; y <= y1; ++y)
     {
-        if (y < 0 || y > ph) continue;
+        if (y < 0 || y >= ph) continue;
 
         int xa = x0 + (int)((y - y0) * dxdy01);
         int xb = x0 + (int)((y - y0) * dxdy02); 
@@ -342,7 +342,7 @@ void kute_fill_triangle(uint32_t *pixels, int pw, int ph, int x0, int y0, int x1
 
     for (int y = y1; y <= y2; ++y)
     {
-        if (y < 0 || y > ph) continue;
+        if (y < 0 || y >= ph) continue;
 
         int xa = x1 + (int)((y - y1) * dxdy12); 
         int xb = x0 + (int)((y - y0) * dxdy02);  
@@ -363,14 +363,14 @@ void kute_draw_char(uint32_t *pixels, int pw, int ph, int x0, int y0, char c, ui
     {
         for (int i = 0; i < 8; ++i)
         {
-            if (bitmap[i] & (1 << j))
+            if (bitmap[j] & (1 << i))
             {
                 for (int js = 0; js < scale; ++js)
                 {
                     for (int is = 0; is < scale; ++is)
                     {
-                        int x = x0 + j * scale + js;
-                        int y = y0 + i * scale + is;
+                        int x = x0 + i * scale + is;
+                        int y = y0 + j * scale + js;
                         uint32_t curr = pixels[x + y * pw];
                         pixels[x + y * pw] = kute_blend_color(color, curr);
                     }
@@ -383,12 +383,13 @@ void kute_draw_char(uint32_t *pixels, int pw, int ph, int x0, int y0, char c, ui
 void kute_draw_text(uint32_t *pixels, int pw, int ph, int x0, int y0, const char* text, uint32_t color, int scale)
 {
     if (!pixels || pw <= 0 || ph <= 0) return;
-    if (x0 < 0 || x0 > pw || y0 < 0 || y0 > ph) return;
+    if (x0 < 0 || x0 >= pw || y0 < 0 || y0 >= ph) return;
     if (!text) return;
 
     int x = x0;
     int w = 8 * scale;
     int h = 8 * scale;
+
 
     while (*text)
     {
@@ -399,6 +400,7 @@ void kute_draw_text(uint32_t *pixels, int pw, int ph, int x0, int y0, const char
         }
         else
         {
+            if (x + 8 * scale > pw) break;
             kute_draw_char(pixels, pw, ph, x, y0, *text, color, scale);
             x += w;
         }
