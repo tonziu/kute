@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kute (web)</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <canvas width="800" height="600"></canvas>
+    <script src="kute.js"></script>
+    <script>
+        kute.loop(() => {
+            const t = performance.now() * 0.002;
+            const r = (Math.sin(t) * 0.5 + 0.5) * 255 | 0;
+            const g = (Math.sin(t * 0.5 + 2) * 0.5 + 0.5) * 255 | 0;
+            const b = (Math.sin(t * 0.3 + 4) * 0.5 + 0.5) * 255 | 0;
+            const color = (r << 24) | (g << 16) | (b << 8) | 0xFF;
+
+            kute.clear(0xFF222222);
+            kute.rect(200, 200, 400, 200, color);
+        });
+    </script>
+</body>
+
+</html>
