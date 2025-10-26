@@ -1,6 +1,7 @@
 web: web/kute.wasm
 
-web/kute.wasm : bin/kute.o
+web/kute.wasm : bin/kute.o src/kute.js
+	cp src/kute.js web/kute.js
 	wasm-ld bin/kute.o -o web/kute.wasm --no-entry --export-all
 
 bin/kute.o : src/kute.c
