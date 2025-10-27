@@ -12,6 +12,10 @@
     <canvas width="800" height="600"></canvas>
     <script src="kute.js"></script>
     <script>
+        x0 = 600;
+        y0 = 100;
+        x1 = 100;
+        y1 = 50;
         kute.loop(() => {
             const t = performance.now() * 0.002;
             const r = (Math.sin(t) * 0.5 + 0.5) * 255 | 0;
@@ -20,7 +24,10 @@
             const color = (r << 24) | (g << 16) | (b << 8) | 0xFF;
 
             kute.clear(0xFF222222);
-            kute.rect(200, 200, 400, 200, color);
+            kute.line(200, 100, 600, 200, color);
+            kute.line(200, 100, 350, 450, color);
+            kute.line(600, 200, 350, 450, color);
+
         });
     </script>
 </body>

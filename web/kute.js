@@ -57,6 +57,14 @@
             this.call('kute_rect', x, y, w, h, color);
         }
 
+        circle(cx, cy, radius, color) {
+            this.call('kute_circle', cx, cy, radius, color);
+        }
+
+        line(x0, y0, x1, y1, color) {
+            this.call('kute_line', x0, y0, x1, y1, color);
+        }
+
         async updateCanvas() {
             if (!this.canvas || !this.width || !this.height) return;
 
