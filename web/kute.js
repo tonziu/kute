@@ -65,6 +65,10 @@
             this.call('kute_line', x0, y0, x1, y1, color);
         }
 
+        triangle(x0, y0, x1, y1, x2, y2, color) {
+            this.call('kute_triangle', x0, y0, x1, y1, x2, y2, color);
+        }
+
         async updateCanvas() {
             if (!this.canvas || !this.width || !this.height) return;
 

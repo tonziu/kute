@@ -6,7 +6,7 @@
 
 #define KUTE_SWAP(a, b, T) do {T temp = *a; *a = *b; *b = temp;} while (0)
 #define KUTE_ABS(x) (x) > 0 ? (x) : -(x)
-#define KUTE_SIGN(x) (x < 0 ? -1 : 1)
+#define KUTE_SIGN(x) ((x) < 0 ? -1 : 1)
 
 static uint32_t pixels[MAX_WIDTH * MAX_HEIGHT];
 static int pw;
@@ -122,5 +122,45 @@ void kute_line(int x0, int y0, int x1, int y1, uint32_t color)
         
         x += 1 * !alongy;
         y += sy * alongy;
+    }
+}
+
+bool kute_edge_fun(int x, int y, int x0, int y0, int x1, int y1)
+{
+    return ((x - x0) * (y1 - y0) - (y - y0) * (x1 - x0) <= 0);
+}
+
+void kute_triangle(int x0, int y0, int x1, int y1, int x2, int y2, uint32_t color)
+{
+    if (pw <= 0 || ph <= 0) return;
+    if (y0 > y1) { KUTE_SWAP(&x0, &x1, int); KUTE_SWAP(&y0, &y1, int); }
+    if (y1 > y2) { KUTE_SWAP(&x1, &x2, int); KUTE_SWAP(&y1, &y2, int); }
+    if (y0 > y1) { KUTE_SWAP(&x0, &x1, int); KUTE_SWAP(&y0, &y1, int); }
+
+    int xmin = x0;
+    if (x1 < xmin) xmin = x1;
+    if (x2 < xmin) xmin = x2;
+
+    int xmax = x0;
+    if (x1 > xmax) xmax = x1;
+    if (x2 > xmax) xmax = x2;
+
+    for (int y = y0; y < y2; ++y)
+    {
+        if (y < 0) continue;
+        if (y >= ph) break;
+        for (int x = xmin; x < xmax; ++x)
+        {
+            if (x < 0) continue;
+            if (x >= pw) break;
+            bool inside = true;
+            inside &= kute_edge_fun(x, y, x0, y0, x1, y1);
+            inside &= kute_edge_fun(x, y, x1, y1, x2, y2);
+            inside &= kute_edge_fun(x, y, x2, y2, x0, y0);
+            if (inside)
+            {
+                pixels[x + y * pw] = color;
+            }
+        }
     }
 }
