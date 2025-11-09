@@ -1,113 +1,74 @@
 #include "kute.h"
+
 #include <stdbool.h>
 
-#define MAX_WIDTH 1024
-#define MAX_HEIGHT 1024
+#define KUTE_SWAP(a, b, T) do {T temp = *(a); *(a) = *(b);*(b) = temp;} while (0)
+#define KUTE_ABS(a) ((a) >= 0) ? (a) : -(a)
+#define KUTE_SIGN(a) (a) >= 0 ? 1 : -1
+#define KUTE_MAT4_AT(m, i, j) (m).data[(i) + (j) * 4]
 
-#define KUTE_SWAP(a, b, T) do {T temp = *a; *a = *b; *b = temp;} while (0)
-#define KUTE_ABS(x) (x) > 0 ? (x) : -(x)
-#define KUTE_SIGN(x) ((x) < 0 ? -1 : 1)
-
-static uint32_t pixels[MAX_WIDTH * MAX_HEIGHT];
-static int pw;
-static int ph;
-
-uint32_t* kute_get_pixels() 
+int kute_edge(int ax, int ay, int bx, int by, int x, int y)
 {
-    return pixels;
+    return (x - ax) * (by - ay) - (y - ay) * (bx - ax);
 }
 
-void kute_init(int width, int height) 
+uint32_t kute_rgba32_pack(kute_color_t color)
 {
-    if (width > MAX_WIDTH) width = MAX_WIDTH;
-    if (height > MAX_HEIGHT) height = MAX_HEIGHT;
-    
-    pw = width;
-    ph = height;
+    // Warning: this is intended for wasm use right now.
+    return color.a << 24 | color.b << 16 | color.g << 8 | color.r;
+}
 
-    for (int i = 0; i < pw * ph; i++) 
+void kute_pixel_put(kute_framebuffer_t *fb, int x, int y, kute_color_t color)
+{
+    if (x < 0 || y < 0)
+        return;
+    if (x >= fb->width || y >= fb->height)
+        return;
+
+    fb->pixels[x + y * fb->width] = kute_rgba32_pack(color);
+}
+
+void kute_pixel_fill(kute_framebuffer_t *fb, kute_color_t color)
+{
+    for (int i = 0; i < fb->width * fb->height; ++i)
     {
-        pixels[i] = 0;
+        fb->pixels[i] = kute_rgba32_pack(color);
     }
 }
 
-void kute_clear(uint32_t color)
+void kute_pixel_line(kute_framebuffer_t *fb, int ax, int ay, int bx, int by, kute_color_t color)
 {
-    if (pw <= 0 || ph <= 0) return;
-
-    for (int i = 0; i < pw * ph; ++i)
+    if (ax > bx)
     {
-        pixels[i] = color;
+        KUTE_SWAP(&ax, &bx, int);
+        KUTE_SWAP(&ay, &by, int);
     }
-}
 
-void kute_rect(int x0, int y0, int rw, int rh, uint32_t color)
-{
-    if (pw <= 0 || ph <= 0) return;
-
-    for (int y = y0; y < y0 + rh; ++y)
-    {
-        if (y >= ph) break;
-        for (int x = x0; x < x0 + rw; ++x)
-        {
-            if (x >= pw) break;
-            pixels[x + y * pw] = color;
-        }
-    }
-}
-
-void kute_circle(int cx, int cy, int radius, uint32_t color)
-{
-    if (pw <= 0 || ph <= 0) return;
-    for (int x = cx - radius - 1; x <= cx + radius; ++x)
-    {
-        if (x >= pw) break;
-        if (x < 0) continue;
-        for (int y = cy - radius - 1; y <= cy + radius; ++y)
-        {
-            if (y >= ph) break;
-            if (y < 0) continue;
-            int dx = x - cx;
-            int dy = y - cy;
-            if (dx * dx + dy * dy <= radius * radius)
-            {
-                pixels[x + y * pw] = color;
-            }
-        }
-    }
-}
-
-void kute_line(int x0, int y0, int x1, int y1, uint32_t color)
-{
-    if (pw <= 0 || ph <= 0) return;
-    if (x0 > x1) 
-    {
-        KUTE_SWAP(&x0, &x1, int);
-        KUTE_SWAP(&y0, &y1, int);
-    }
-    
-    int dx = KUTE_ABS(x1 - x0);
-    int dy = KUTE_ABS(y1 - y0);
-    int sy = KUTE_SIGN(y1 - y0);
+    int dx = KUTE_ABS(bx - ax);
+    int dy = KUTE_ABS(by - ay);
+    int sy = KUTE_SIGN(by - ay);
     bool alongy = 0;
 
-    if (dy > dx) 
+    if (dy > dx)
     {
         alongy = 1;
         KUTE_SWAP(&dx, &dy, int);
     }
 
     int e = 2 * dy - dx;
-    int x = x0;
-    int y = y0;
+    int x = ax;
+    int y = ay;
 
     while (1)
     {
-        if (x == x1 && y == y1) break;
-        if (x < 0 || y < 0) continue;
-        if (x >= pw || y >= ph) break;
+        if (x == bx && y == by)
+            break;
+        if (x < 0 || y < 0)
+            continue;
+        if (x >= fb->width || y >= fb->height)
+            break;
 
-        pixels[x + y * pw] = color;
+        kute_pixel_put(fb, x, y, color);
 
         if (e >= 0)
         {
@@ -119,48 +80,348 @@ void kute_line(int x0, int y0, int x1, int y1, uint32_t color)
         {
             e += dy;
         }
-        
+
         x += 1 * !alongy;
         y += sy * alongy;
     }
 }
 
-bool kute_edge_fun(int x, int y, int x0, int y0, int x1, int y1)
+void kute_pixel_rect(kute_framebuffer_t *fb, int x, int y, int rw, int rh, kute_color_t color)
 {
-    return ((x - x0) * (y1 - y0) - (y - y0) * (x1 - x0) <= 0);
-}
-
-void kute_triangle(int x0, int y0, int x1, int y1, int x2, int y2, uint32_t color)
-{
-    if (pw <= 0 || ph <= 0) return;
-    if (y0 > y1) { KUTE_SWAP(&x0, &x1, int); KUTE_SWAP(&y0, &y1, int); }
-    if (y1 > y2) { KUTE_SWAP(&x1, &x2, int); KUTE_SWAP(&y1, &y2, int); }
-    if (y0 > y1) { KUTE_SWAP(&x0, &x1, int); KUTE_SWAP(&y0, &y1, int); }
-
-    int xmin = x0;
-    if (x1 < xmin) xmin = x1;
-    if (x2 < xmin) xmin = x2;
-
-    int xmax = x0;
-    if (x1 > xmax) xmax = x1;
-    if (x2 > xmax) xmax = x2;
-
-    for (int y = y0; y < y2; ++y)
+    for (int col = y; col < y + rh; ++col)
     {
-        if (y < 0) continue;
-        if (y >= ph) break;
-        for (int x = xmin; x < xmax; ++x)
+        for (int row = x; row < x + rw; ++row)
         {
-            if (x < 0) continue;
-            if (x >= pw) break;
-            bool inside = true;
-            inside &= kute_edge_fun(x, y, x0, y0, x1, y1);
-            inside &= kute_edge_fun(x, y, x1, y1, x2, y2);
-            inside &= kute_edge_fun(x, y, x2, y2, x0, y0);
-            if (inside)
-            {
-                pixels[x + y * pw] = color;
-            }
+            kute_pixel_put(fb, row, col, color);
         }
     }
+}
+
+void kute_pixel_triangle(kute_framebuffer_t* fb, int ax, int ay, int bx, int by, int cx, int cy, kute_color_t color)
+{
+    int minx = ax < bx ? (ax < cx ? ax : cx) : (bx < cx ? bx : cx);
+    int maxx = ax > bx ? (ax > cx ? ax : cx) : (bx > cx ? bx : cx);
+    int miny = ay < by ? (ay < cy ? ay : cy) : (by < cy ? by : cy);
+    int maxy = ay > by ? (ay > cy ? ay : cy) : (by > cy ? by : cy);
+
+    for (int y = miny; y < maxy; ++y)
+    {
+        for (int x = minx; x < maxx; ++x)
+        {
+            bool is_inside = kute_edge(bx, by, cx, cy, x, y) >= 0;
+            is_inside &= kute_edge(cx, cy, ax, ay, x, y) >= 0;
+            is_inside &= kute_edge(ax, ay, bx, by, x, y) >= 0;
+            if (is_inside) kute_pixel_put(fb, x, y, color);
+        }
+    }
+}
+
+void kute_pixel_line_interp(kute_framebuffer_t* fb, int ax, int ay, int bx, int by, kute_color_t c0, kute_color_t c1)
+{
+    if (ax > bx)
+    {
+        KUTE_SWAP(&ax, &bx, int);
+        KUTE_SWAP(&ay, &by, int);
+    }
+
+    int dx = KUTE_ABS(bx - ax);
+    int dy = KUTE_ABS(by - ay);
+    int sy = KUTE_SIGN(by - ay);
+    bool alongy = 0;
+
+    if (dy > dx)
+    {
+        alongy = 1;
+        KUTE_SWAP(&dx, &dy, int);
+    }
+
+    int e = 2 * dy - dx;
+    int x = ax;
+    int y = ay;
+    int length = dx > dy ? dx : dy;
+    int step = 0;
+
+    while (1)
+    {
+        if (x == bx && y == by)
+            break;
+        if (x < 0 || y < 0)
+            continue;
+        if (x >= fb->width || y >= fb->height)
+            break;
+
+        kute_color_t c;
+        float t = (float) step / (float) length;
+        c.r = (uint8_t)((1-t)*c0.r + t*c1.r);
+        c.g = (uint8_t)((1-t)*c0.g + t*c1.g);
+        c.b = (uint8_t)((1-t)*c0.b + t*c1.b);
+        c.a = (uint8_t)((1-t)*c0.a + t*c1.a);
+        kute_pixel_put(fb, x, y, c);
+
+        if (e >= 0)
+        {
+            x += 1 * alongy;
+            y += sy * !alongy;
+            e += (dy - dx);
+        }
+        else
+        {
+            e += dy;
+        }
+
+        x += 1 * !alongy;
+        y += sy * alongy;
+        step++;
+    }
+}
+
+void kute_pixel_triangle_interp(kute_framebuffer_t* fb, int ax, int ay, int bx, int by, int cx, int cy, kute_color_t c0, kute_color_t c1, kute_color_t c2)
+{
+    int minx = ax < bx ? (ax < cx ? ax : cx) : (bx < cx ? bx : cx);
+    int maxx = ax > bx ? (ax > cx ? ax : cx) : (bx > cx ? bx : cx);
+    int miny = ay < by ? (ay < cy ? ay : cy) : (by < cy ? by : cy);
+    int maxy = ay > by ? (ay > cy ? ay : cy) : (by > cy ? by : cy);
+
+    int area = kute_edge(ax, ay, bx, by, cx, cy);
+    if (area == 0) return;
+
+    int abs_area = KUTE_ABS(area);
+
+    for (int y = miny; y < maxy; ++y)
+    {
+        for (int x = minx; x < maxx; ++x)
+        {
+            float w0 = kute_edge(bx, by, cx, cy, x, y);
+            float w1 = kute_edge(cx, cy, ax, ay, x, y);
+            float w2 = kute_edge(ax, ay, bx, by, x, y);
+            bool is_inside = (area > 0) ? (w0 >= 0 && w1 >= 0 && w2 >= 0) 
+                                     : (w0 <= 0 && w1 <= 0 && w2 <= 0);
+
+            if (is_inside) 
+            {
+                w0 /= (float) area;
+                w1 /= (float) area;
+                w2 /= (float) area;
+                kute_color_t c;
+                c.r = w0 * c0.r + w1 * c1.r + w2*c2.r;
+                c.g = w0 * c0.g + w1 * c1.g + w2*c2.g;
+                c.b = w0 * c0.b + w1 * c1.b + w2*c2.b;
+                c.a = w0 * c0.a + w1 * c1.a + w2*c2.a;
+                kute_pixel_put(fb, x, y, c);
+            } 
+        }
+    }
+}
+
+kute_mat4_t kute_mat4_identity()
+{
+    kute_mat4_t result = {0};
+    for (int i = 0; i < 4; ++i)
+    {
+        KUTE_MAT4_AT(result, i, i) = 1;
+    }
+    return result;
+}
+
+kute_mat4_t kute_mat4_add(kute_mat4_t a, kute_mat4_t b)
+{
+    kute_mat4_t result;
+    for (int i = 0; i < 4; ++i)
+    {
+        for (int j = 0; j < 4; ++j)
+        {
+            KUTE_MAT4_AT(result, i, j) = KUTE_MAT4_AT(a, i, j) + KUTE_MAT4_AT(b, i, j);
+        }
+    }
+    return result;
+}
+
+kute_mat4_t kute_mat4_sub(kute_mat4_t a, kute_mat4_t b)
+{
+    kute_mat4_t result;
+    for (int i = 0; i < 4; ++i)
+    {
+        for (int j = 0; j < 4; ++j)
+        {
+            KUTE_MAT4_AT(result, i, j) = KUTE_MAT4_AT(a, i, j) - KUTE_MAT4_AT(b, i, j);
+        }
+    }
+    return result;
+}
+
+kute_mat4_t kute_mat4_mul(kute_mat4_t a, kute_mat4_t b)
+{
+    kute_mat4_t result;
+    for (int i = 0; i < 4; ++i)
+    {
+        for (int j = 0; j < 4; ++j)
+        {
+            float sum = 0;
+            for (int r = 0; r < 4; ++r)
+            {
+                sum += KUTE_MAT4_AT(a, i, r) * KUTE_MAT4_AT(b, r, j);
+            }
+            KUTE_MAT4_AT(result, i, j) = sum;
+        }
+    }
+    return result;
+}
+
+kute_vec3_t kute_vec3_add(kute_vec3_t a, kute_vec3_t b)
+{
+    return (kute_vec3_t) {a.x + b.x, a.y + b.y, a.z + b.z};
+}
+
+kute_vec3_t kute_vec3_sub(kute_vec3_t a, kute_vec3_t b)
+{
+    return (kute_vec3_t) {a.x - b.x, a.y - b.y, a.z - b.z};
+}
+
+kute_vec3_t kute_vec3_cross(kute_vec3_t a, kute_vec3_t b)
+{
+    kute_vec3_t result;
+    result.x = a.y * b.z - a.z * b.y;
+    result.y = a.z * b.x - a.x * b.z;
+    result.z = a.x * b.y - a.y * b.x;
+    return result;
+}
+
+float kute_vec3_dot(kute_vec3_t a, kute_vec3_t b)
+{
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+float kute_vec4_dot(kute_vec4_t a, kute_vec4_t b)
+{
+    return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+}
+
+float kute_vec3_length(kute_vec3_t a)
+{
+    return sqrtf(kute_vec3_dot(a, a));
+}
+
+kute_vec3_t kute_vec3_normalize(kute_vec3_t a)
+{
+    float len = kute_vec3_length(a);
+    if (len == 0.0f) return (kute_vec3_t) {0, 0, 0};
+    float inv = 1.0f / len;
+    return (kute_vec3_t) {a.x * inv, a.y * inv, a.z * inv};
+}
+
+kute_mat4_t kute_mat4_look_at(kute_vec3_t eye, kute_vec3_t target, kute_vec3_t up)
+{
+    kute_vec3_t zaxis = kute_vec3_normalize(kute_vec3_sub(eye, target));
+    kute_vec3_t xaxis = kute_vec3_normalize(kute_vec3_cross(up, zaxis));
+    kute_vec3_t yaxis = kute_vec3_cross(zaxis, xaxis);
+
+    kute_mat4_t view = kute_mat4_identity();
+
+    KUTE_MAT4_AT(view, 0, 0) = xaxis.x;
+    KUTE_MAT4_AT(view, 0, 1) = xaxis.y;
+    KUTE_MAT4_AT(view, 0, 2) = xaxis.z;
+    KUTE_MAT4_AT(view, 0, 3) = -kute_vec3_dot(xaxis, eye);
+
+    KUTE_MAT4_AT(view, 1, 0) = yaxis.x;
+    KUTE_MAT4_AT(view, 1, 1) = yaxis.y;
+    KUTE_MAT4_AT(view, 1, 2) = yaxis.z;
+    KUTE_MAT4_AT(view, 1, 3) = -kute_vec3_dot(yaxis, eye);
+
+    KUTE_MAT4_AT(view, 2, 0) = zaxis.x;
+    KUTE_MAT4_AT(view, 2, 1) = zaxis.y;
+    KUTE_MAT4_AT(view, 2, 2) = zaxis.z;
+    KUTE_MAT4_AT(view, 2, 3) = -kute_vec3_dot(zaxis, eye);
+
+    KUTE_MAT4_AT(view, 3, 3) = 1.0f;
+
+    return view;
+}
+
+kute_mat4_t kute_mat4_perspective(float fov, float aspect, float near, float far)
+{
+    float f = 1.0f / tanf(fov * 0.5f);
+    
+    kute_mat4_t result = {0};
+    KUTE_MAT4_AT(result, 0, 0) = f / aspect;
+    KUTE_MAT4_AT(result, 1, 1) = f;
+    KUTE_MAT4_AT(result, 2, 2) = (far + near) / (near - far);
+    KUTE_MAT4_AT(result, 2, 3) = (2.0f * far * near) / (near - far);
+    KUTE_MAT4_AT(result, 3, 2) = -1.0f;
+    
+    return result;
+}
+
+kute_vec4_t kute_mat4_row(kute_mat4_t m, int row)
+{
+    kute_vec4_t result;
+
+    result.x = KUTE_MAT4_AT(m, row, 0);
+    result.y = KUTE_MAT4_AT(m, row, 1);
+    result.z = KUTE_MAT4_AT(m, row, 2);
+    result.w = KUTE_MAT4_AT(m, row, 3);
+
+    return result;
+}
+
+kute_vec4_t kute_mat4_mul_vec4(kute_mat4_t m, kute_vec4_t v)
+{
+    kute_vec4_t result;
+
+    kute_vec4_t x = kute_mat4_row(m, 0);
+    kute_vec4_t y = kute_mat4_row(m, 1);
+    kute_vec4_t z = kute_mat4_row(m, 2);
+    kute_vec4_t w = kute_mat4_row(m, 3);
+
+    result.x = kute_vec4_dot(x, v);
+    result.y = kute_vec4_dot(y, v);
+    result.z = kute_vec4_dot(z, v);
+    result.w = kute_vec4_dot(w, v);
+
+    return result;
+}
+
+kute_vec3_t kute_vec4_to_ndc(kute_mat4_t mvp, kute_vec4_t pos)
+{
+    kute_vec4_t clip = kute_mat4_mul_vec4(mvp, pos);
+    kute_vec3_t ndc;
+    
+    ndc.x = clip.x / clip.w;
+    ndc.y = clip.y / clip.w;
+    ndc.z = clip.z / clip.w;
+
+    return ndc;
+}
+
+kute_vec2_t kute_ndc_to_screen(kute_vec3_t ndc, int width, int height)
+{
+    kute_vec2_t result;
+    result.x = (ndc.x + 1.0f) * 0.5f * width;
+    result.y = (1.0f - ndc.y) * 0.5f * height;
+    return result;
+}
+
+kute_mat4_t kute_mat4_translation(float x, float y, float z)
+{
+    kute_mat4_t m = kute_mat4_identity();
+
+    KUTE_MAT4_AT(m, 0, 3) = x;
+    KUTE_MAT4_AT(m, 1, 3) = y;
+    KUTE_MAT4_AT(m, 2, 3) = z;
+
+    return m;
+}
+
+kute_mat4_t kute_mat4_rotation_y(float radians)
+{
+    kute_mat4_t m = kute_mat4_identity();
+
+    float c = cosf(radians);
+    float s = sinf(radians);
+
+    KUTE_MAT4_AT(m, 0, 0) = c;
+    KUTE_MAT4_AT(m, 0, 2) = s;
+    KUTE_MAT4_AT(m, 2, 0) = -s;
+    KUTE_MAT4_AT(m, 2, 2) = c;
+
+    return m;
 }

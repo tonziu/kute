@@ -1,5 +1,9 @@
 body {
-    background-color: black;
+    background-color: #1E1E1E;
+    color: #E0E0E0;
+    font-weight: 300;
+    font-size: medium;
+    font-family: "Inter";
 }
 
 canvas {
