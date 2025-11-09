@@ -3,7 +3,12 @@ async function InitCanvas(canvasId, wasmPath) {
     const bytes = await response.arrayBuffer();
 
     const { instance } = await WebAssembly.instantiate(bytes, {
-        env: { tanf: Math.tan}
+        env: { 
+            cosf: Math.cos,
+            sinf: Math.sin,
+            tanf: Math.tan,
+            sqrtf: Math.sqrt,
+        }
     });
 
     let canvas = document.getElementById(canvasId);
