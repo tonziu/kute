@@ -1,0 +1,32 @@
+body {
+    background-color: #1E1E1E;
+    color: #E0E0E0;
+    font-weight: 300;
+    font-size: medium;
+    font-family: "Inter";
+}
+
+main {
+    margin: 50px;
+    text-align: justify;
+}
+
+main b {
+    color: #3ba8ec;
+}
+
+main pre {
+    background-color: #101010;
+    width: 800px;
+}
+
+canvas {
+    background-color: #101010;
+    border-color: rgb(104, 107, 111);
+    border-width: 2px;
+    border-style: solid;
+}
+
+main section hr {
+    border-color: black;
+}

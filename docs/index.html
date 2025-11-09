@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kute - Website</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <header> </header>
+    <main>
+        <h1> Kute </h1>
+        <section>
+            <p> Welcome! Here you will find my development journey of <b>Kute</b>,
+                which is my tiny software renderer in C. <br><br>
+                Kute is born with portability in mind. To keep this vision alive,
+                my intention is to document the whole project on this website and showcasing
+                its features right here, embedding its logic in webassembly code
+                that can be loaded in an html page fairly easily.
+            </p>
+            <hr>
+        </section>
+
+        <section>
+            <h2> A basic build system </h2>
+            <section>
+                The first problem that I need to solve is to simply compile some C code.
+                To start with a very simple setup, my first choice is a <b> Makefile </b>
+                with a dummy target just to check that everything works:
+                <pre>
+            <code>
+            # Makefile
+
+            hello: hello.o
+            clang build/hello.o -o build/hello.exe
+
+            hello.o: src/hello.c
+            clang -c src/hello.c -o build/hello.o
+            </code>
+            </pre>
+                where hello.c looks like this:
+                <pre>
+            <code>
+            // hello.c
+
+            #include &lt;stdio.h&gt;
+
+            int main(void)
+            {
+                printf("Hello World.\n");
+                return 0;
+            }
+            </code>
+            </pre>
+                As expected, if I run the executable I get the nice and traditional message in the console.
+                Okay, we're good to go!
+                <hr>
+            </section>
+
+            <h2> First web integration </h2>
+            <section>
+                <p>
+                    Now the fun begins! We want to be able to colour some pixels of a canvas element in this html page.
+                    The order I have in mind is:
+                <ul>
+                    <li>
+                        Build a wasm module that owns an array of pixels
+                    </li>
+                    <li>
+                        Load the wasm module into this html
+                    </li>
+                    <li>
+                        Loop over a render logic that colours a canvas using functions
+                        exported from the wasm module
+                    </li>
+                </ul>
+                </p>
+
+                <h3> The wasm module </h3>
+                The bare minimum of a wasm module should make us able to retrieve the memory location of some pixels,
+                and some loop logic that is called every frame by javascript. Since I want to avoid misalignments
+                between
+                the canvas and framebuffer (the actual pixels), I also use two helpers to get the right width and height
+                of the canvas.
+                <pre>
+            <code>
+            # wasm.c
+
+            #include &lt;stdint.h&gt;
+
+            #define WIDTH 400
+            #define HEIGHT 300
+
+            static uint32_t pixels[WIDTH * HEIGHT];
+
+            uint32_t *wasm_get_pixels() {
+                return pixels;
+            }
+
+            int wasm_get_width(void) {
+                return WIDTH;
+            }
+
+            int wasm_get_height(void) {
+                return HEIGHT;
+            }
+
+            void wasm_loop(void) {
+                for (int i = 0; i < WIDTH * HEIGHT; ++i) {
+                    pixels[i] = 0xFFFF0000;
+                }
+            }
+            </code>
+            </pre>
+                Now we need a new version of the Makefile to create this module and we will be ready to load it into the
+                html.
+                <pre>
+            <code>
+            # Makefile
+
+            wasm: build/wasm.o
+                wasm-ld build/wasm.o -o build/module.wasm --no-entry --export-all
+                cp build/module.wasm ../website/wasm/module.wasm
+
+            build/wasm.o: platform/wasm.c
+                clang -c platform/wasm.c -o build/wasm.o --target=wasm32
+
+            clean:
+                rm build/*    
+            </code>
+            </pre>
+                <h3> Importing the module </h3>
+                Now that we have a <em> module.wasm </em> to import into our html, we just need some javascript code
+                to read the module and link it to a canvas element. Since I plan to instantiate different modules, each
+                one
+                with
+                some rendering logic, I create an helper function to use for each canvas.
+                <pre>
+            <code>
+            # wasm_integration.js
+
+            async function InitCanvas(canvasId, wasmPath) {
+                const response = await fetch(wasmPath);
+                const bytes = await response.arrayBuffer();
+
+                const { instance } = await WebAssembly.instantiate(bytes, {
+                    env: {}
+                });
+
+                let canvas = document.getElementById(canvasId);
+                canvas.width = instance.exports.wasm_get_width();
+                canvas.height = instance.exports.wasm_get_height();
+
+                const ptr = instance.exports.wasm_get_pixels();
+                const pixels = new Uint32Array(
+                    instance.exports.memory.buffer,
+                    ptr,
+                    canvas.width * canvas.height
+                );
+
+                const ctx = canvas.getContext('2d');
+
+                function loop() {
+                    instance.exports.wasm_loop();
+
+                    const imageData = new ImageData(
+                        new Uint8ClampedArray(pixels.buffer, pixels.byteOffset, pixels.byteLength),
+                        canvas.width,
+                        canvas.height
+                    );
+                    ctx.putImageData(imageData, 0, 0);
+                    requestAnimationFrame(loop);
+                }
+
+                loop();
+            }
+            </code>
+            </pre>
+                Here the interesting bit is that the module instance must comply to a simple API (the exports), and this
+                can help us to design our library in the near future. Then in the html I just define a canvas and
+                then call this function. Below the result.
+            </section>
+
+            <h3> The final canvas </h3>
+            <canvas id="canvas-1"> </canvas>
+            <br>
+            Perfect! We managed to have some coloured pixels on the screen. Now we can move on and implement
+            features in our library not worrying about the web platform, at least for a bit.
+            <hr>
+        </section>
+        <section>
+            <h2> Drawing lines </h2>
+            After some refactoring, like wrapping the pixels buffer in a dedicated structure (a framebuffer),
+            I can move on to drawing some primitives, which will be the core of all the fancy rendering that we can build
+            in the future. After some research, I ended up discovering the <b>Bresenham</b>'s Line Algorithm, which allows you to
+            draw a line avoiding float values to approximate the line's slope.
+            
+            <br><br>
+            I won't discuss the math behind it, you can find many resources online that are great in that.
+            The basic idea is that you don't need the slope to render a line, but you can cycle horizontally
+            (or vertically depending on the direction) and calculate an error at each iteration. This error 
+            is a measure of how close you are to a pixel or the one immediately after (up/down or left/right).
+            If this error is positive, you go in one direction, if it is negative you go to the other one, and by not
+            needing the actual value but only the sign, you can avoid float values. To understand the implementation,
+            try to derive the math, it is fairly simple once you read some material or if you start playing
+            with the line's equation.
+            <br><br>
+            After some trials, my method ended up looking like this:
+            <pre>
+            <code>
+            void kute_pixel_line(kute_framebuffer_t *fb, int ax, int ay, int bx, int by, kute_color_t color)
+            {
+                if (ax > bx)
+                {
+                    KUTE_SWAP(&ax, &bx, int);
+                    KUTE_SWAP(&ay, &by, int);
+                }
+
+                int dx = KUTE_ABS(bx - ax);
+                int dy = KUTE_ABS(by - ay);
+                int sy = KUTE_SIGN(by - ay);
+                bool alongy = 0;
+
+                if (dy > dx)
+                {
+                    alongy = 1;
+                    KUTE_SWAP(&dx, &dy, int);
+                }
+
+                int e = 2 * dy - dx;
+                int x = ax;
+                int y = ay;
+
+                while (1)
+                {
+                    if (x == bx && y == by)
+                        break;
+                    if (x < 0 || y < 0)
+                        continue;
+                    if (x >= fb->width || y >= fb->height)
+                        break;
+
+                    kute_pixel_put(fb, x, y, color);
+
+                    if (e >= 0)
+                    {
+                        x += 1 * alongy;
+                        y += sy * !alongy;
+                        e += (dy - dx);
+                    }
+                    else
+                    {
+                        e += dy;
+                    }
+
+                    x += 1 * !alongy;
+                    y += sy * alongy;
+                }
+            }
+            </code>
+            </pre>
+            Now it is time to test this function in a canvas! So I tried to draw a wireframed triangle:
+            <pre>
+            <code>
+            // Canvas is 600x400
+            void wasm_loop(void) {
+                kute_pixel_fill(&fb, KUTE_BLACK);
+                kute_pixel_line(&fb, 200, 300, 400, 300, KUTE_RED);
+                kute_pixel_line(&fb, 400, 300, 300, 100, KUTE_GREEN);
+                kute_pixel_line(&fb, 300, 100, 200, 300, KUTE_BLUE);
+            }
+            </code>
+            </pre>
+            As you can see I also added some helpers to quickly have colours instead of using raw uint32_t values.
+            <h3> The final canvas </h3>
+            <canvas id="canvas-2"> </canvas>
+            <hr>
+        </section>
+        
+    </main>
+    <footer> </footer>
+    <script src="js/wasm_integration.js"> </script>
+    <script>
+        InitCanvas("canvas-1", "wasm/wasm_fill.wasm");
+        InitCanvas("canvas-2", "wasm/wasm_line.wasm");
+    </script>
+</body>
+
+</html>
