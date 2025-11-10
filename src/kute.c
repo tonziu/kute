@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 
+#define KUTE_DEPTH_MAX (1 << 16)
 #define KUTE_SWAP(a, b, T) do {T temp = *(a); *(a) = *(b);*(b) = temp;} while (0)
 #define KUTE_ABS(a) ((a) >= 0) ? (a) : -(a)
 #define KUTE_SIGN(a) (a) >= 0 ? 1 : -1
@@ -18,14 +19,19 @@ uint32_t kute_rgba32_pack(kute_color_t color)
     return color.a << 24 | color.b << 16 | color.g << 8 | color.r;
 }
 
-void kute_pixel_put(kute_framebuffer_t *fb, int x, int y, kute_color_t color)
+void kute_pixel_put(kute_framebuffer_t* fb, int x, int y, int z, kute_color_t color)
 {
     if (x < 0 || y < 0)
         return;
     if (x >= fb->width || y >= fb->height)
         return;
 
-    fb->pixels[x + y * fb->width] = kute_rgba32_pack(color);
+    int idx = x + y * fb->width;
+    if (z < fb->depth[idx])
+    {
+        fb->depth[idx] = z;
+        fb->pixels[idx] = kute_rgba32_pack(color);
+    }
 }
 
 void kute_pixel_fill(kute_framebuffer_t *fb, kute_color_t color)
@@ -33,6 +39,15 @@ void kute_pixel_fill(kute_framebuffer_t *fb, kute_color_t color)
     for (int i = 0; i < fb->width * fb->height; ++i)
     {
         fb->pixels[i] = kute_rgba32_pack(color);
+    }
+}
+
+void kute_pixel_clear(kute_framebuffer_t *fb, kute_color_t color)
+{
+    for (int i = 0; i < fb->width * fb->height; ++i)
+    {
+        fb->pixels[i] = kute_rgba32_pack(color);
+        fb->depth[i] = KUTE_DEPTH_MAX;
     }
 }
 
@@ -68,7 +83,7 @@ void kute_pixel_line(kute_framebuffer_t *fb, int ax, int ay, int bx, int by, kut
         if (x >= fb->width || y >= fb->height)
             break;
 
-        kute_pixel_put(fb, x, y, color);
+        kute_pixel_put(fb, x, y, 0, color);
 
         if (e >= 0)
         {
@@ -92,7 +107,7 @@ void kute_pixel_rect(kute_framebuffer_t *fb, int x, int y, int rw, int rh, kute_
     {
         for (int row = x; row < x + rw; ++row)
         {
-            kute_pixel_put(fb, row, col, color);
+            kute_pixel_put(fb, row, col, 0, color);
         }
     }
 }
@@ -104,14 +119,23 @@ void kute_pixel_triangle(kute_framebuffer_t* fb, int ax, int ay, int bx, int by,
     int miny = ay < by ? (ay < cy ? ay : cy) : (by < cy ? by : cy);
     int maxy = ay > by ? (ay > cy ? ay : cy) : (by > cy ? by : cy);
 
+    int area = kute_edge(ax, ay, bx, by, cx, cy);
+    if (area == 0) return;
+
+    int abs_area = KUTE_ABS(area);
+
     for (int y = miny; y < maxy; ++y)
     {
         for (int x = minx; x < maxx; ++x)
         {
-            bool is_inside = kute_edge(bx, by, cx, cy, x, y) >= 0;
-            is_inside &= kute_edge(cx, cy, ax, ay, x, y) >= 0;
-            is_inside &= kute_edge(ax, ay, bx, by, x, y) >= 0;
-            if (is_inside) kute_pixel_put(fb, x, y, color);
+
+            float w0 = kute_edge(bx, by, cx, cy, x, y);
+            float w1 = kute_edge(cx, cy, ax, ay, x, y);
+            float w2 = kute_edge(ax, ay, bx, by, x, y);
+            bool is_inside = (area > 0) ? (w0 >= 0 && w1 >= 0 && w2 >= 0) 
+                                     : (w0 <= 0 && w1 <= 0 && w2 <= 0);
+
+            if (is_inside) kute_pixel_put(fb, x, y, 0, color);
         }
     }
 }
@@ -156,7 +180,7 @@ void kute_pixel_line_interp(kute_framebuffer_t* fb, int ax, int ay, int bx, int 
         c.g = (uint8_t)((1-t)*c0.g + t*c1.g);
         c.b = (uint8_t)((1-t)*c0.b + t*c1.b);
         c.a = (uint8_t)((1-t)*c0.a + t*c1.a);
-        kute_pixel_put(fb, x, y, c);
+        kute_pixel_put(fb, x, y, 0, c);
 
         if (e >= 0)
         {
@@ -175,14 +199,14 @@ void kute_pixel_line_interp(kute_framebuffer_t* fb, int ax, int ay, int bx, int 
     }
 }
 
-void kute_pixel_triangle_interp(kute_framebuffer_t* fb, int ax, int ay, int bx, int by, int cx, int cy, kute_color_t c0, kute_color_t c1, kute_color_t c2)
+void kute_pixel_triangle_interp(kute_framebuffer_t* fb, kute_vertex_t a, kute_vertex_t b, kute_vertex_t c)
 {
-    int minx = ax < bx ? (ax < cx ? ax : cx) : (bx < cx ? bx : cx);
-    int maxx = ax > bx ? (ax > cx ? ax : cx) : (bx > cx ? bx : cx);
-    int miny = ay < by ? (ay < cy ? ay : cy) : (by < cy ? by : cy);
-    int maxy = ay > by ? (ay > cy ? ay : cy) : (by > cy ? by : cy);
+    int minx = a.pos.x < b.pos.x ? (a.pos.x < c.pos.x ? a.pos.x : c.pos.x) : (b.pos.x < c.pos.x ? b.pos.x : c.pos.x);
+    int maxx = a.pos.x > b.pos.x ? (a.pos.x > c.pos.x ? a.pos.x : c.pos.x) : (b.pos.x > c.pos.x ? b.pos.x : c.pos.x);
+    int miny = a.pos.y < b.pos.y ? (a.pos.y < c.pos.y ? a.pos.y : c.pos.y) : (b.pos.y < c.pos.y ? b.pos.y : c.pos.y);
+    int maxy = a.pos.y > b.pos.y ? (a.pos.y > c.pos.y ? a.pos.y : c.pos.y) : (b.pos.y > c.pos.y ? b.pos.y : c.pos.y);
 
-    int area = kute_edge(ax, ay, bx, by, cx, cy);
+    int area = kute_edge(a.pos.x, a.pos.y, b.pos.x, b.pos.y, c.pos.x, c.pos.y);
     if (area == 0) return;
 
     int abs_area = KUTE_ABS(area);
@@ -191,9 +215,9 @@ void kute_pixel_triangle_interp(kute_framebuffer_t* fb, int ax, int ay, int bx, 
     {
         for (int x = minx; x < maxx; ++x)
         {
-            float w0 = kute_edge(bx, by, cx, cy, x, y);
-            float w1 = kute_edge(cx, cy, ax, ay, x, y);
-            float w2 = kute_edge(ax, ay, bx, by, x, y);
+            float w0 = kute_edge(b.pos.x, b.pos.y, c.pos.x, c.pos.y, x, y);
+            float w1 = kute_edge(c.pos.x, c.pos.y, a.pos.x, a.pos.y, x, y);
+            float w2 = kute_edge(a.pos.x, a.pos.y, b.pos.x, b.pos.y, x, y);
             bool is_inside = (area > 0) ? (w0 >= 0 && w1 >= 0 && w2 >= 0) 
                                      : (w0 <= 0 && w1 <= 0 && w2 <= 0);
 
@@ -202,12 +226,15 @@ void kute_pixel_triangle_interp(kute_framebuffer_t* fb, int ax, int ay, int bx, 
                 w0 /= (float) area;
                 w1 /= (float) area;
                 w2 /= (float) area;
-                kute_color_t c;
-                c.r = w0 * c0.r + w1 * c1.r + w2*c2.r;
-                c.g = w0 * c0.g + w1 * c1.g + w2*c2.g;
-                c.b = w0 * c0.b + w1 * c1.b + w2*c2.b;
-                c.a = w0 * c0.a + w1 * c1.a + w2*c2.a;
-                kute_pixel_put(fb, x, y, c);
+                
+                kute_color_t color;
+                color.r = w0 * a.color.r + w1 * b.color.r + w2* c.color.r;
+                color.g = w0 * a.color.g + w1 * b.color.g + w2* c.color.g;
+                color.b = w0 * a.color.b + w1 * b.color.b + w2* c.color.b;
+                color.a = w0 * a.color.a + w1 * b.color.a + w2* c.color.a;
+                float zf = w0 * a.pos.z + w1 * b.pos.z + w2 * c.pos.z;
+                int z = (int)(zf * KUTE_DEPTH_MAX);
+                kute_pixel_put(fb, x, y, z, color);
             } 
         }
     }
@@ -392,11 +419,12 @@ kute_vec3_t kute_vec4_to_ndc(kute_mat4_t mvp, kute_vec4_t pos)
     return ndc;
 }
 
-kute_vec2_t kute_ndc_to_screen(kute_vec3_t ndc, int width, int height)
+kute_vec3_t kute_ndc_to_screen(kute_vec3_t ndc, int width, int height)
 {
-    kute_vec2_t result;
+    kute_vec3_t result;
     result.x = (ndc.x + 1.0f) * 0.5f * width;
     result.y = (1.0f - ndc.y) * 0.5f * height;
+    result.z = (ndc.z + 1.0f) * 0.5f;
     return result;
 }
 

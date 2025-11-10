@@ -16,6 +16,7 @@ typedef struct
 typedef struct
 {
     kute_pixel_t* pixels;
+    float *depth;
     int width;
     int height;
 } kute_framebuffer_t;
@@ -53,6 +54,12 @@ typedef struct
     kute_vec3_t up;
 } kute_camera_t;
 
+typedef struct
+{
+    kute_vec3_t pos;
+    kute_color_t color;
+} kute_vertex_t;
+
 
 #define KUTE_RED   (kute_color_t) {255,   0,   0, 255}
 #define KUTE_GREEN (kute_color_t) {  0, 255,   0, 255}
@@ -85,17 +92,18 @@ kute_mat4_t kute_mat4_look_at(kute_vec3_t eye, kute_vec3_t target, kute_vec3_t u
 kute_mat4_t kute_mat4_perspective(float fov, float aspect, float near, float far);
 
 kute_vec3_t kute_vec4_to_ndc(kute_mat4_t mvp, kute_vec4_t pos);
-kute_vec2_t kute_ndc_to_screen(kute_vec3_t ndc, int width, int height);
+kute_vec3_t kute_ndc_to_screen(kute_vec3_t ndc, int width, int height);
 
 uint32_t kute_rgba32_pack(kute_color_t color);
 
-void kute_pixel_put(kute_framebuffer_t* fb, int x, int y, kute_color_t color);
+void kute_pixel_put(kute_framebuffer_t* fb, int x, int y, int z, kute_color_t color);
+void kute_pixel_clear(kute_framebuffer_t *fb, kute_color_t color);
 void kute_pixel_fill(kute_framebuffer_t* fb, kute_color_t color);
 void kute_pixel_line(kute_framebuffer_t* fb, int ax, int ay, int bx, int by, kute_color_t color);
 void kute_pixel_rect(kute_framebuffer_t* fb, int x, int y, int rw, int rh, kute_color_t color);
 void kute_pixel_triangle(kute_framebuffer_t* fb, int ax, int ay, int bx, int by, int cx, int cy, kute_color_t color);
 
 void kute_pixel_line_interp(kute_framebuffer_t* fb, int ax, int ay, int bx, int by, kute_color_t c0, kute_color_t c1);
-void kute_pixel_triangle_interp(kute_framebuffer_t* fb, int ax, int ay, int bx, int by, int cx, int cy, kute_color_t c0, kute_color_t c1, kute_color_t c2);
+void kute_pixel_triangle_interp(kute_framebuffer_t* fb, kute_vertex_t a, kute_vertex_t b, kute_vertex_t c);
 
 #endif // H_KUTE

@@ -3,8 +3,12 @@
 #define WIDTH 600
 #define HEIGHT 400
 
-static kute_pixel_t buffer[WIDTH * HEIGHT];
-static kute_framebuffer_t fb = {buffer, WIDTH, HEIGHT};
+static kute_pixel_t pixel_buffer[WIDTH * HEIGHT];
+static float depth_buffer[WIDTH * HEIGHT];
+static kute_framebuffer_t fb = {.pixels = pixel_buffer, 
+                                .depth  = depth_buffer,
+                                .width  = WIDTH, 
+                                .height = HEIGHT};
 
 kute_pixel_t *wasm_get_pixels()
 {
@@ -21,10 +25,16 @@ int wasm_get_height(void)
     return fb.height;
 }
 
-kute_vec4_t triangle[3] = {
+kute_vec4_t triangle1[3] = {
     { -0.5f, -0.5f, 0.0f, 1.0f },
     {  0.5f, -0.5f, 0.0f, 1.0f },
     {  0.0f,  0.5f, 0.0f, 1.0f }
+};
+
+kute_vec4_t triangle2[3] = {
+    {  0.0f, -0.5f,  0.5f, 1.0f },
+    {  0.0f, -0.5f, -0.5f, 1.0f },
+    {  0.0f,  0.5f,  0.0f, 1.0f }
 };
 
 kute_camera_t cam = {
@@ -48,18 +58,22 @@ void wasm_loop(void)
     kute_mat4_t model = kute_mat4_rotation_y(angle);
     kute_mat4_t mvp = kute_mat4_mul(projection, kute_mat4_mul(view, model));
 
-    kute_vec2_t screen_tri[3];
+    kute_vertex_t vertices1[3];
+    kute_vertex_t vertices2[3];
+    kute_color_t colors[] = {KUTE_RED, KUTE_GREEN, KUTE_BLUE};
 
     for (int i = 0; i < 3; i++)
     {
-        kute_vec3_t ndc = kute_vec4_to_ndc(mvp, triangle[i]);
-        screen_tri[i] = kute_ndc_to_screen(ndc, fb.width, fb.height);
+        kute_vec3_t ndc1 = kute_vec4_to_ndc(mvp, triangle1[i]);
+        kute_vec3_t ndc2 = kute_vec4_to_ndc(mvp, triangle2[i]);
+        vertices1[i].pos = kute_ndc_to_screen(ndc1, fb.width, fb.height);
+        vertices2[i].pos = kute_ndc_to_screen(ndc2, fb.width, fb.height);
+        vertices1[i].color = colors[i];
+        vertices2[i].color = colors[i];
     }
 
-    kute_pixel_fill(&fb, KUTE_BLACK);
+    kute_pixel_clear(&fb, KUTE_BLACK);
 
-    kute_pixel_triangle_interp(&fb, screen_tri[0].x, screen_tri[0].y,
-                                    screen_tri[1].x, screen_tri[1].y,
-                                    screen_tri[2].x, screen_tri[2].y,
-                                    KUTE_RED, KUTE_GREEN, KUTE_BLUE);
+    kute_pixel_triangle_interp(&fb, vertices1[0], vertices1[1], vertices1[2]);
+    kute_pixel_triangle_interp(&fb, vertices2[0], vertices2[1], vertices2[2]);
 }
