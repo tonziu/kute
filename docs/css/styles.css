@@ -17,7 +17,6 @@ main b {
 
 main pre {
     background-color: #101010;
-    width: 800px;
 }
 
 canvas {
@@ -29,4 +28,19 @@ canvas {
 
 main section hr {
     border-color: black;
+}
+
+footer {
+    text-align: right;
+    
+}
+
+footer a {
+    color: #3ba8ec;
+    margin-right: 50px;
+}
+
+footer hr {
+   border-color: rgb(163, 163, 163);
+   border-style: groove;
 }
