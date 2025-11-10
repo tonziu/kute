@@ -56,7 +56,7 @@ typedef struct
 
 typedef struct
 {
-    kute_vec3_t pos;
+    kute_vec4_t pos;
     kute_color_t color;
 } kute_vertex_t;
 
@@ -91,8 +91,8 @@ kute_vec4_t kute_mat4_mul_vec4(kute_mat4_t m, kute_vec4_t v);
 kute_mat4_t kute_mat4_look_at(kute_vec3_t eye, kute_vec3_t target, kute_vec3_t up);
 kute_mat4_t kute_mat4_perspective(float fov, float aspect, float near, float far);
 
-kute_vec3_t kute_vec4_to_ndc(kute_mat4_t mvp, kute_vec4_t pos);
-kute_vec3_t kute_ndc_to_screen(kute_vec3_t ndc, int width, int height);
+kute_vec4_t kute_vec4_to_ndc(kute_mat4_t mvp, kute_vec4_t pos);
+kute_vec4_t kute_vec4_to_screen(kute_vec4_t ndc, int width, int height);
 
 uint32_t kute_rgba32_pack(kute_color_t color);
 

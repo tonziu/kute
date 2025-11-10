@@ -64,10 +64,10 @@ void wasm_loop(void)
 
     for (int i = 0; i < 3; i++)
     {
-        kute_vec3_t ndc1 = kute_vec4_to_ndc(mvp, triangle1[i]);
-        kute_vec3_t ndc2 = kute_vec4_to_ndc(mvp, triangle2[i]);
-        vertices1[i].pos = kute_ndc_to_screen(ndc1, fb.width, fb.height);
-        vertices2[i].pos = kute_ndc_to_screen(ndc2, fb.width, fb.height);
+        kute_vec4_t ndc1 = kute_vec4_to_ndc(mvp, triangle1[i]);
+        kute_vec4_t ndc2 = kute_vec4_to_ndc(mvp, triangle2[i]);
+        vertices1[i].pos = kute_vec4_to_screen(ndc1, fb.width, fb.height);
+        vertices2[i].pos = kute_vec4_to_screen(ndc2, fb.width, fb.height);
         vertices1[i].color = colors[i];
         vertices2[i].color = colors[i];
     }

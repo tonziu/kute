@@ -223,16 +223,24 @@ void kute_pixel_triangle_interp(kute_framebuffer_t* fb, kute_vertex_t a, kute_ve
 
             if (is_inside) 
             {
-                w0 /= (float) area;
-                w1 /= (float) area;
-                w2 /= (float) area;
+                float w0_inv = 1.0f / a.pos.w;
+                float w1_inv = 1.0f / b.pos.w;
+                float w2_inv = 1.0f / c.pos.w;
                 
+                float denom = w0 * w0_inv + w1 * w1_inv + w2 * w2_inv;
+                float inv_denom = 1.0f / denom;
+
+                float l0 = (w0 * w0_inv) * inv_denom;
+                float l1 = (w1 * w1_inv) * inv_denom;
+                float l2 = (w2 * w2_inv) * inv_denom;
+
                 kute_color_t color;
-                color.r = w0 * a.color.r + w1 * b.color.r + w2* c.color.r;
-                color.g = w0 * a.color.g + w1 * b.color.g + w2* c.color.g;
-                color.b = w0 * a.color.b + w1 * b.color.b + w2* c.color.b;
-                color.a = w0 * a.color.a + w1 * b.color.a + w2* c.color.a;
-                float zf = w0 * a.pos.z + w1 * b.pos.z + w2 * c.pos.z;
+                color.r = l0 * a.color.r + l1 * b.color.r + l2 * c.color.r;
+                color.g = l0 * a.color.g + l1 * b.color.g + l2 * c.color.g;
+                color.b = l0 * a.color.b + l1 * b.color.b + l2 * c.color.b;
+                color.a = l0 * a.color.a + l1 * b.color.a + l2 * c.color.a;
+
+                float zf = l0 * a.pos.z + l1 * b.pos.z + l2 * c.pos.z;
                 int z = (int)(zf * KUTE_DEPTH_MAX);
                 kute_pixel_put(fb, x, y, z, color);
             } 
@@ -407,24 +415,26 @@ kute_vec4_t kute_mat4_mul_vec4(kute_mat4_t m, kute_vec4_t v)
     return result;
 }
 
-kute_vec3_t kute_vec4_to_ndc(kute_mat4_t mvp, kute_vec4_t pos)
+kute_vec4_t kute_vec4_to_ndc(kute_mat4_t mvp, kute_vec4_t pos)
 {
     kute_vec4_t clip = kute_mat4_mul_vec4(mvp, pos);
-    kute_vec3_t ndc;
+    kute_vec4_t ndc;
     
     ndc.x = clip.x / clip.w;
     ndc.y = clip.y / clip.w;
     ndc.z = clip.z / clip.w;
+    ndc.w = clip.w;
 
     return ndc;
 }
 
-kute_vec3_t kute_ndc_to_screen(kute_vec3_t ndc, int width, int height)
+kute_vec4_t kute_vec4_to_screen(kute_vec4_t ndc, int width, int height)
 {
-    kute_vec3_t result;
+    kute_vec4_t result;
     result.x = (ndc.x + 1.0f) * 0.5f * width;
     result.y = (1.0f - ndc.y) * 0.5f * height;
     result.z = (ndc.z + 1.0f) * 0.5f;
+    result.w = ndc.w;
     return result;
 }
 
